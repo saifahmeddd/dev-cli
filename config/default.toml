@@ -1,0 +1,5 @@
+# Default configuration for dev CLI
+# This file serves as a fallback when ~/.dev/config.toml doesn't exist
+
+# Placeholder for future configuration options
+

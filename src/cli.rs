@@ -1,74 +1,99 @@
-use clap::{Parser, Subcommand, Args};
+use clap::{Parser, Subcommand};
 
-#[derive(Parser)]
+/// A stateful developer workflow CLI tool
+#[derive(Parser, Debug)]
 #[command(name = "dev")]
-#[command(about = "The Ultimate Developer CLI Tool", long_about = None)]
+#[command(about = "A stateful developer workflow CLI", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Option<Commands>,
+    pub command: Commands,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Project Context Switcher
+    /// Context switching commands
     Ctx(CtxArgs),
-    /// Error Explainer
+    /// Error explanation (wtf)
     Wtf(WtfArgs),
-    /// Command Snippet Manager
+    /// Command snippet management
     Snip(SnipArgs),
-    /// Tool configuration
+    /// Configuration management
     Config(ConfigArgs),
 }
 
-#[derive(Args, Debug)]
+#[derive(Parser, Debug)]
 pub struct CtxArgs {
     #[command(subcommand)]
-    pub command: Option<CtxCommands>,
+    pub command: CtxCommand,
 }
 
 #[derive(Subcommand, Debug)]
-pub enum CtxCommands {
-    Switch { name: String },
-    Save { name: String },
-    Show { name: String },
+pub enum CtxCommand {
+    /// Save current context
+    Save {
+        /// Name of the context
+        name: String,
+    },
+    /// Switch to a saved context (outputs shell code)
+    Switch {
+        /// Name of the context
+        name: String,
+    },
+    /// List all saved contexts
     List,
-    Current,
-    Delete { name: String },
+    /// Delete a saved context
+    Delete {
+        /// Name of the context
+        name: String,
+    },
 }
 
-#[derive(Args, Debug)]
+#[derive(Parser, Debug)]
 pub struct WtfArgs {
-    pub error_msg: Option<String>,
+    /// Error text to explain
+    #[arg(required = true)]
+    pub error_text: String,
 }
 
-#[derive(Args, Debug)]
+#[derive(Parser, Debug)]
 pub struct SnipArgs {
     #[command(subcommand)]
-    pub command: Option<SnipCommands>,
+    pub command: SnipCommand,
 }
 
 #[derive(Subcommand, Debug)]
-pub enum SnipCommands {
-    Add,
-    Run {
-        #[arg(default_value = None)]
-        name: Option<String>,
-        #[arg(last = true)]
-        args: Vec<String>,
+pub enum SnipCommand {
+    /// Add a new snippet
+    Add {
+        /// Name of the snippet
+        name: String,
+        /// Command template (use {var} for variables)
+        command: String,
+        /// Tags (comma-separated)
+        #[arg(short, long)]
+        tags: Option<String>,
     },
-    List,
-    Search,
+    /// List all snippets
+    List {
+        /// Filter by tag
+        #[arg(short, long)]
+        tag: Option<String>,
+    },
+    /// Run a snippet
+    Run {
+        /// Name of the snippet
+        name: String,
+        /// Variables as key=value pairs
+        #[arg(short, long)]
+        vars: Vec<String>,
+        /// Dry-run mode (don't execute, just show command)
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
-#[derive(Args, Debug)]
+#[derive(Parser, Debug)]
 pub struct ConfigArgs {
-    #[command(subcommand)]
-    pub command: Option<ConfigCommands>,
+    // Placeholder for future arguments
 }
 
-#[derive(Subcommand, Debug)]
-pub enum ConfigCommands {
-    Init,
-    Edit,
-    Show,
-}
