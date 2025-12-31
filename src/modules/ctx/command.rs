@@ -13,13 +13,25 @@ pub fn run(args: CtxArgs, app_ctx: &mut AppContext) -> Result<()> {
         CtxCommand::Save { name } => save_context(name, app_ctx),
         CtxCommand::Switch { name } => switch_context(name, app_ctx),
         CtxCommand::List => list_contexts(app_ctx),
+        CtxCommand::Show { name } => show_context(name, app_ctx),
         CtxCommand::Delete { name } => delete_context(name, app_ctx),
+        CtxCommand::Diff { name } => diff_context(name, app_ctx),
     }
 }
 
 fn save_context(name: String, app_ctx: &mut AppContext) -> Result<()> {
     println!("Detecting project context...");
     
+    let context = capture_context(&name)?;
+    
+    app_ctx.state.save_context(context)
+        .with_context(|| format!("Failed to save context '{}'", name))?;
+    
+    println!("✓ Saved context '{}'", name);
+    Ok(())
+}
+
+fn capture_context(name: &str) -> Result<Context> {
     // Get current working directory
     let working_dir = env::current_dir()
         .context("Failed to get current working directory")?
@@ -44,8 +56,8 @@ fn save_context(name: String, app_ctx: &mut AppContext) -> Result<()> {
     let important_files = find_important_files(working_path, &project_type)?;
     let important_dirs = find_important_dirs(working_path, &project_type)?;
     
-    let context = Context {
-        name: name.clone(),
+    Ok(Context {
+        name: name.to_string(),
         working_dir,
         git_branch,
         env_vars,
@@ -56,13 +68,117 @@ fn save_context(name: String, app_ctx: &mut AppContext) -> Result<()> {
         important_files,
         important_dirs,
         package_manager,
-    };
+    })
+}
+
+fn diff_context(name: String, app_ctx: &mut AppContext) -> Result<()> {
+    // 1. Get saved context
+    let saved_ctx = app_ctx.state.get_context(&name)
+        .with_context(|| format!("Failed to get context '{}'", name))?
+        .ok_or_else(|| anyhow::anyhow!("Context '{}' not found", name))?;
+        
+    // 2. Capture current state
+    let current_ctx = capture_context("current")?;
     
-    app_ctx.state.save_context(context)
-        .with_context(|| format!("Failed to save context '{}'", name))?;
+    println!("Context Diff: Current vs Saved ('{}')\n", name);
     
-    println!("✓ Saved context '{}'", name);
+    // Working Directory
+    if current_ctx.working_dir != saved_ctx.working_dir {
+        println!("📂 Working Dircetory:");
+        println!("  Current: {}", current_ctx.working_dir);
+        println!("  Saved:   {}", saved_ctx.working_dir);
+    } else {
+        println!("📂 Working Directory: Unchanged ({})", saved_ctx.working_dir);
+    }
+    
+    // Git Branch
+    if current_ctx.git_branch != saved_ctx.git_branch {
+        println!("\n🌿 Git Branch:");
+        println!("  Current: {}", current_ctx.git_branch.as_deref().unwrap_or("None"));
+        println!("  Saved:   {}", saved_ctx.git_branch.as_deref().unwrap_or("None"));
+        
+        // Check for uncommitted changes if we go to a different branch or same branch
+        if let Ok(changes) = check_uncommitted_changes(Path::new(&current_ctx.working_dir)) {
+            if changes > 0 {
+                println!("  ⚠️  {} uncommitted changes in current directory", changes);
+            }
+        }
+    } else {
+        println!("\n🌿 Git Branch: Unchanged ({})", saved_ctx.git_branch.as_deref().unwrap_or("None"));
+        if let Ok(changes) = check_uncommitted_changes(Path::new(&current_ctx.working_dir)) {
+            if changes > 0 {
+                println!("  ⚠️  {} uncommitted changes", changes);
+            }
+        }
+    }
+    
+    // Dependencies
+    // Compare dependencies maps
+    let mut added_deps = Vec::new();
+    let mut removed_deps = Vec::new();
+    
+    for (dep, _) in &current_ctx.dependencies {
+        if !saved_ctx.dependencies.contains_key(dep) {
+            added_deps.push(dep);
+        }
+    }
+    
+    for (dep, _) in &saved_ctx.dependencies {
+        if !current_ctx.dependencies.contains_key(dep) {
+            removed_deps.push(dep);
+        }
+    }
+    
+    if !added_deps.is_empty() || !removed_deps.is_empty() {
+        println!("\n📚 Dependencies:");
+        for dep in added_deps {
+            println!("  + {}", dep);
+        }
+        for dep in removed_deps {
+            println!("  - {}", dep);
+        }
+    } else {
+        println!("\n📚 Dependencies: Unchanged");
+    }
+    
+    // Env Vars
+    // Basic count difference or specific vars
+    let mut different_vars = Vec::new();
+    for (k, v) in &current_ctx.env_vars {
+        if let Some(saved_v) = saved_ctx.env_vars.get(k) {
+            if v != saved_v {
+                different_vars.push(k);
+            }
+        } else {
+            different_vars.push(k); // New var
+        }
+    }
+    
+    if !different_vars.is_empty() {
+        println!("\n🔐 Environment Variables:");
+        println!("  {} variables differ or are new", different_vars.len());
+    } else {
+        println!("\n🔐 Environment Variables: Unchanged");
+    }
+
     Ok(())
+}
+
+fn check_uncommitted_changes(working_dir: &Path) -> Result<usize> {
+    let output = Command::new("git")
+        .current_dir(working_dir)
+        .arg("status")
+        .arg("--porcelain")
+        .output()
+        .context("Failed to check git status")?;
+        
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let changes = stdout.lines().count();
+        Ok(changes)
+    } else {
+        Ok(0) // Not a git repo or error
+    }
 }
 
 fn switch_context(name: String, app_ctx: &mut AppContext) -> Result<()> {
@@ -215,6 +331,90 @@ fn list_contexts(app_ctx: &mut AppContext) -> Result<()> {
             }
         }
     }
+    
+    Ok(())
+}
+
+fn show_context(name: String, app_ctx: &mut AppContext) -> Result<()> {
+    let context = app_ctx.state.get_context(&name)
+        .with_context(|| format!("Failed to get context '{}'", name))?
+        .ok_or_else(|| anyhow::anyhow!("Context '{}' not found", name))?;
+    
+    println!("Context: {}\n", context.name);
+    println!("{}", "━".repeat(50));
+    
+    // Basic Information
+    println!("\n📁 Working Directory:");
+    println!("  {}", context.working_dir);
+    
+    if let Some(branch) = &context.git_branch {
+        println!("\n🌿 Git Branch:");
+        println!("  {}", branch);
+    }
+    
+    // Project Type
+    if let Some(pt) = &context.project_type {
+        println!("\n📦 Project Type:");
+        println!("  {:?}", pt);
+    }
+    
+    // Package Manager
+    if let Some(pm) = &context.package_manager {
+        println!("\n🔧 Package Manager:");
+        println!("  {}", pm);
+    }
+    
+    // Virtual Environment
+    if let Some(venv) = &context.virtual_env {
+        println!("\n🐍 Virtual Environment:");
+        println!("  {}", venv);
+    }
+    
+    // Dependencies
+    if !context.dependencies.is_empty() {
+        println!("\n📚 Dependencies:");
+        for (key, value) in &context.dependencies {
+            println!("  • {}: {}", key, value);
+        }
+    }
+    
+    // Important Files
+    if !context.important_files.is_empty() {
+        println!("\n📄 Important Files:");
+        for file in &context.important_files {
+            println!("  • {}", file);
+        }
+    }
+    
+    // Important Directories
+    if !context.important_dirs.is_empty() {
+        println!("\n📂 Important Directories:");
+        for dir in &context.important_dirs {
+            println!("  • {}", dir);
+        }
+    }
+    
+    // Environment Variables
+    if !context.env_vars.is_empty() {
+        println!("\n🔐 Environment Variables:");
+        for (key, value) in &context.env_vars {
+            // Truncate long values for display
+            let display_value = if value.len() > 60 {
+                format!("{}...", &value[..60])
+            } else {
+                value.clone()
+            };
+            println!("  • {} = {}", key, display_value);
+        }
+    }
+    
+    // On Switch Hook
+    if let Some(hook) = &context.on_switch {
+        println!("\n⚡ On Switch Hook:");
+        println!("  {}", hook);
+    }
+    
+    println!("\n{}", "━".repeat(50));
     
     Ok(())
 }

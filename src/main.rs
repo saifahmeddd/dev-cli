@@ -4,6 +4,7 @@ mod config;
 mod modules;
 mod platform;
 mod state;
+mod utils;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -11,6 +12,8 @@ use env_logger;
 use state::store::StateStore;
 
 fn main() {
+    // Load .env file if it exists
+    dotenv::dotenv().ok();
     // Initialize logging from RUST_LOG environment variable
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
     

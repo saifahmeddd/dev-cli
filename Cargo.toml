@@ -14,4 +14,11 @@ dirs = "5.0"
 rusqlite = { version = "0.31", features = ["bundled"] }
 sha2 = "0.10"
 regex = "1.10"
-
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+keyring = "3.0"
+chrono = "0.4"
+tabled = "0.15"
+dialoguer = "0.11"
+tokio = { version = "1.0", features = ["full"] } # Adding tokio just in case we need async later, but using blocking reqwest for now
+rand = "0.8"
+dotenv = "0.15"

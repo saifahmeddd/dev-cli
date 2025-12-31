@@ -28,6 +28,21 @@ pub fn run(cli: Cli, mut ctx: AppContext) -> Result<()> {
         Commands::Snip(args) => {
             crate::modules::snip::run(args, &mut ctx)
         }
+        Commands::Git(args) => {
+            crate::modules::git::run(args, &mut ctx)
+        }
+        Commands::Deps(args) => {
+            crate::modules::deps::run(args, &mut ctx)
+        }
+        Commands::Docs(args) => {
+            crate::modules::docs::run(args, &mut ctx)
+        }
+        Commands::Secrets(args) => {
+            crate::modules::secrets::run(args, &mut ctx)
+        }
+        Commands::Db(args) => {
+            crate::modules::db::run(args, &mut ctx)
+        }
         Commands::Config(_args) => {
             println!("config: Configuration management (placeholder - not yet implemented)");
             Ok(())

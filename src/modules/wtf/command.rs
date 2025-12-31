@@ -24,8 +24,15 @@ pub fn run(args: WtfArgs, app_ctx: &mut AppContext) -> Result<()> {
         return Ok(());
     }
     
-    // Generate deterministic explanation stub
-    let explanation = generate_explanation(error_text, &fingerprint);
+    // Generate deterministic explanation stub or use API
+    let explanation = match call_llm_api(error_text, &fingerprint) {
+        Ok(api_explanation) => api_explanation,
+        Err(e) => {
+            eprintln!("⚠️  API Call Failed: {}", e);
+            eprintln!("Falling back to pattern matching...\n");
+            generate_explanation(error_text, &fingerprint)
+        }
+    };
     
     // Save to cache
     app_ctx.state.save_wtf_explanation(explanation.clone())
@@ -70,6 +77,33 @@ fn normalize_error_text(text: &str) -> String {
     
     normalized.trim().to_string()
 }
+
+use crate::utils::llm::call_llm_json;
+
+// ... (imports)
+
+// remove calling_llm_api and OpenAIChoice/Response structs
+
+fn call_llm_api(error_text: &str, fingerprint: &str) -> Result<WtfExplanation> {
+    let system_prompt = "You are a helpful coding assistant. You explain errors and suggest fixes. Output valid JSON only with 'cause' and 'suggested_fix' fields.";
+    let user_prompt = format!(
+        "Explain this error concisely and provide a suggested fix.\\n\\nError: {}",
+        error_text
+    );
+    
+    let parsed = call_llm_json(system_prompt, &user_prompt)?;
+    
+    let cause = parsed["cause"].as_str().unwrap_or("Unknown cause").to_string();
+    let suggested_fix = parsed["suggested_fix"].as_str().unwrap_or("No fix suggested").to_string();
+    
+    Ok(WtfExplanation {
+        fingerprint: fingerprint.to_string(),
+        cause,
+        suggested_fix,
+        confidence: 0.9,
+    })
+}
+
 
 fn generate_explanation(error_text: &str, fingerprint: &str) -> WtfExplanation {
     // Deterministic explanation stub based on error patterns

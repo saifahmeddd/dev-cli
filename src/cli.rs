@@ -19,6 +19,130 @@ pub enum Commands {
     Snip(SnipArgs),
     /// Configuration management
     Config(ConfigArgs),
+    /// Git workflow tools
+    Git(GitArgs),
+    /// Dependency management
+    Deps(DepsArgs),
+    /// Documentation tools
+    Docs(DocsArgs),
+    /// Secrets management
+    Secrets(SecretsArgs),
+    /// Database management
+    Db(DbArgs),
+}
+
+#[derive(Parser, Debug)]
+pub struct DocsArgs {
+    #[command(subcommand)]
+    pub command: DocsCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum DocsCommand {
+    /// Auto-generate docs from code
+    Generate {
+        /// File to document
+        file: String,
+    },
+    /// Generate README.md from project structure
+    Readme,
+    /// Generate API documentation
+    Api,
+    /// Keep docs in sync with code
+    Sync,
+    /// Search docs
+    Search {
+        /// Query string
+        query: String,
+    },
+}
+
+#[derive(Parser, Debug)]
+pub struct SecretsArgs {
+    #[command(subcommand)]
+    pub command: SecretsCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum SecretsCommand {
+    /// Add a new secret
+    Add {
+        /// Key name
+        key: String,
+        /// Secret value (interactive if not provided)
+        #[arg(short, long)]
+        value: Option<String>,
+    },
+    /// Retrieve a secret
+    Get {
+        /// Key name
+        key: String,
+    },
+    /// List all keys
+    List,
+    /// Rotate a secret
+    Rotate {
+        /// Key name
+        key: String,
+    },
+    /// Sync with external vault
+    Sync,
+}
+
+#[derive(Parser, Debug)]
+pub struct DbArgs {
+    #[command(subcommand)]
+    pub command: DbCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum DbCommand {
+    /// List configured databases
+    List,
+    /// Connect to a database shell
+    Connect {
+        /// Database name
+        name: String,
+    },
+    /// Backup a database
+    Backup {
+        /// Database name
+        name: String,
+    },
+    /// Run pending migrations
+    Migrate,
+    /// Seed database with test data
+    Seed,
+    /// Compare database schemas
+    Diff,
+}
+
+#[derive(Parser, Debug)]
+pub struct DepsArgs {
+    #[command(subcommand)]
+    pub command: DepsCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum DepsCommand {
+    /// Scan for security vulnerabilities
+    Scan,
+    /// Check for outdated packages
+    Outdated,
+    /// Update dependencies (wrapper)
+    Update {
+        /// Safe update (patches only)
+        #[arg(long)]
+        safe: bool,
+    },
+    /// Audit all projects in a directory
+    Audit {
+        /// Directory to audit
+        #[arg(long, default_value = ".")]
+        path: String,
+    },
+    /// Compare dependencies across projects (placeholder)
+    Compare,
 }
 
 #[derive(Parser, Debug)]
@@ -41,9 +165,19 @@ pub enum CtxCommand {
     },
     /// List all saved contexts
     List,
+    /// Show details of a saved context
+    Show {
+        /// Name of the context
+        name: String,
+    },
     /// Delete a saved context
     Delete {
         /// Name of the context
+        name: String,
+    },
+    /// Compare current state with a saved context
+    Diff {
+        /// Name of the context to compare against
         name: String,
     },
 }
@@ -95,5 +229,39 @@ pub enum SnipCommand {
 #[derive(Parser, Debug)]
 pub struct ConfigArgs {
     // Placeholder for future arguments
+}
+
+#[derive(Parser, Debug)]
+pub struct GitArgs {
+    #[command(subcommand)]
+    pub command: GitCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum GitCommand {
+    /// Generate a commit message using AI
+    SmartCommit {
+        /// Optional hint for the commit message
+        #[arg(short, long)]
+        hint: Option<String>,
+        /// Dry run (print message but don't commit)
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Interactive code review checklist
+    Review,
+    /// Clean up merged branches and stale remotes
+    Cleanup {
+        /// Dry run
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Show contribution stats
+    Stats,
+    /// Quick worktree management
+    Worktree {
+        /// Name of the worktree (branch name)
+        name: String,
+    },
 }
 
